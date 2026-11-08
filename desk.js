@@ -52,7 +52,7 @@ const reports=()=>records("report/");
 const events=()=>records("event/");
 const uid=()=>crypto.randomUUID?.()??`${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let settings={...DEFAULT_SETTINGS}, currentView="", currentReport=null;
-let draftInspection=null, inspectorOpen=false, shownSites="all", detailSite=null, currentRead=null;
+let draftInspection=null, shownSites="all", detailSite=null, currentRead=null;
 let zoom={preview:"auto",reader:100};
 const zoomSteps=[25,50,75,100,125,150,175,200];
 let toastTimer;
@@ -142,9 +142,29 @@ function mountPaper(box,report,issue,mode){
   box.innerHTML=`<div class="paper-frame">${paper(report,issue)}</div>`;
   observer.observe(box);resizePaper(mode);
 }
+function showPrioritySite(){
+  const box=$("#priority-site"),[key]=sitesNeedingReview();
+  if(!key){
+    box.innerHTML='<div><h2>먼저 확인할 현장</h2><p>현재 확인이 필요한 현장이 없습니다.</p></div>';
+    return;
+  }
+  const site=SITES[key],inspection=key==="B"?latestInspection():null;
+  const [reading]=demoRows(key,LAST_DAY);
+  const reason=key==="B"?`마지막 수신 ${reading.received.slice(-5)} · 입력 수신 지연으로 ${reading.base.slice(-5)} 예측 보류`:site.detail;
+  const status=inspection?.status||"미처리";
+  const inspectionActions={"미처리":"점검 열기","확인 중":"점검 이어가기","점검 기록 완료":"점검 기록 보기"};
+  const action=key==="B"?(inspectionActions[status]||"점검 열기"):"예측 상세 보기";
+  const hadFocus=box.contains(document.activeElement);
+  box.innerHTML=`<div class="priority-info"><h2>먼저 확인할 현장 <small>${shortDate(LAST_DAY)} · UTC+8</small></h2>
+    <div class="priority-name"><strong>${scopeName(key)}</strong><span class="status ${key}">${site.label}</span></div>
+    <p>${html(reason)}</p>${inspection?.nextCheck?`<p class="priority-next"><b>다음 확인</b> ${html(inspection.nextCheck)}</p>`:""}</div>
+    <div class="priority-action"><span>${html(inspection?.owner||(key==="B"?"담당자 미지정":site.owner))}${key==="B"?" · "+html(status):""}</span>
+    <a class="primary compact" href="#sites/${key}">${key} 현장 ${action} ${icon("arrow")}</a></div>`;
+  if(hadFocus)$("a",box).focus({preventScroll:true});
+}
 function studio(){
   const siteOptions=["A","B","C","all"].map(site=>`<option value="${site}" ${site===settings.site?"selected":""}>${scopeName(site)}</option>`).join("");
-  work.innerHTML=`<div class="studio-grid"><form class="config" id="config">
+  work.innerHTML=`<section id="priority-site" class="priority-site" aria-label="먼저 확인할 현장"></section><div class="studio-grid"><form class="config" id="config">
     <div class="panel-head"><h2>${icon("sliders")}레포트 설정</h2><span class="paper-size">A4</span></div>
     <div class="fields"><fieldset><legend>레포트 종류</legend><div class="segments">${[["daily","일간 레포트"],["weekly","주간 레포트"]].map(([v,l])=>`<label><input type="radio" name="type" value="${v}" ${settings.type===v?"checked":""}><span>${l}</span></label>`).join("")}</div></fieldset>
     <label class="field">대상 발전소<select name="site">${siteOptions}</select></label>
@@ -156,7 +176,7 @@ function studio(){
     <details class="memo-entry" ${settings.note?"open":""}><summary>운영자 메모 <small>선택</small></summary><label><span class="sr-only">운영자 메모</span><textarea name="note" maxlength="160" rows="3" placeholder="보고서에 남길 내용을 입력하세요.">${html(settings.note)}</textarea></label></details>
     <p id="form-error" role="alert"></p><button class="primary generate" type="submit">${icon("fileplus")}레포트 생성${icon("arrow")}</button><p class="save-hint">${icon("archive")}생성한 문서는 보관함에 저장됩니다.</p></div>
   </form><section class="preview" aria-label="문서 미리보기">${toolbar("preview")}<div class="paper-scroll" id="preview-scroll" tabindex="0" aria-label="레포트 미리보기 문서"></div></section></div>`;
-  refreshPreview();
+  showPrioritySite();refreshPreview();
 }
 function refreshPreview(){
   const invalid=settingsError(settings),box=$("#preview-scroll");
@@ -215,9 +235,9 @@ function siteDetail(site){
     <div class="detail-body"><div class="detail-meta"><span>2026.11.09 · 입력 수신 07:55 · 예측 기준 08:00 (UTC+8)</span>${legend()}</div>${chart(report.series)}<table class="doc-table"><thead><tr><th>대상 시각</th><th>관측 GHI (W/m²)</th><th>예측 GHI (W/m²)</th><th>상태</th></tr></thead><tbody>${report.rows.map(r=>`<tr><td>${r.hour}</td><td>${numberText(r.observed)}</td><td>${numberText(r.predicted)}</td><td>${r.state}</td></tr>`).join("")}</tbody></table><button class="primary compact" data-site-report="${site}">이 현장 레포트 작성 ${icon("arrow")}</button></div></section>`;
 }
 function sites(){
-  const latest=latestInspection();
-  const keys=shownSites==="need"?["B","A"]:["B","A","C"];
-  work.innerHTML=`<section class="ledger"><div class="ledger-heading"><h2>발전소 현황</h2><span class="muted">2026.11.09 · UTC+8</span></div><div class="site-filters">${[["all","전체 3"],["need","확인 필요 2"]].map(([value,label])=>`<button class="plain-btn" data-filter="${value}" aria-pressed="${shownSites===value}">${label}</button>`).join("")}</div><div class="site-list">${keys.map(key=>`<div class="site-row"><div class="site-id">${key}</div><div><strong>${SITES[key].name}</strong><p>${SITES[key].detail}</p></div><div><span class="status ${key}">${SITES[key].label}</span><p>${key==="B"?`${html(latest?.owner||"담당자 미지정")} · ${html(latest?.status||"미처리")}`:SITES[key].owner}</p></div><button class="plain-btn" data-detail="${key}">${key==="B"?"수신 상태 점검":"예측 상세 보기"} ${icon("arrow")}</button></div>`).join("")}</div></section>${inspectorOpen?inspector():detailSite?siteDetail(detailSite):""}`;
+  const latest=latestInspection(),need=sitesNeedingReview();
+  const keys=shownSites==="need"?need:[...need,...Object.keys(SITES).filter(key=>!need.includes(key))];
+  work.innerHTML=`<section class="ledger"><div class="ledger-heading"><h2>발전소 현황</h2><span class="muted">2026.11.09 · UTC+8</span></div><div class="site-filters">${[["all",`전체 ${Object.keys(SITES).length}`],["need",`확인 필요 ${need.length}`]].map(([value,label])=>`<button class="plain-btn" data-filter="${value}" aria-pressed="${shownSites===value}">${label}</button>`).join("")}</div><div class="site-list">${keys.map(key=>`<div class="site-row"><div class="site-id">${key}</div><div><strong>${SITES[key].name}</strong><p>${SITES[key].detail}</p></div><div><span class="status ${key}">${SITES[key].label}</span><p>${key==="B"?`${html(latest?.owner||"담당자 미지정")} · ${html(latest?.status||"미처리")}`:SITES[key].owner}</p></div><button class="plain-btn" data-detail="${key}">${key==="B"?"수신 상태 점검":"예측 상세 보기"} ${icon("arrow")}</button></div>`).join("")}</div></section>${detailSite==="B"?inspector():detailSite?siteDetail(detailSite):""}`;
 }
 function readDraft(){
   if(!$("#inspection-form"))return;
@@ -237,17 +257,27 @@ function saveInspection(status){
   draftInspection=null;sites();notice(storageAvailable?"점검 기록을 저장했습니다.":"현재 탭에 점검 기록을 저장했습니다.");
   $(".inspection-result").scrollIntoView({block:"nearest"});
 }
-function renderRoute(){
-  const page=location.hash.slice(1),view=["studio","sites","archive"].includes(page)?page:"studio";
-  readDraft();observer.disconnect();currentView=view;
+function renderRoute(navigate=false){
+  const [page,site]=location.hash.slice(1).split("/");
+  const view=["studio","sites","archive"].includes(page)?page:"studio",previousDetail=detailSite;
+  observer.disconnect();currentView=view;
+  detailSite=view==="sites" && Object.hasOwn(SITES,site)?site:null;
   const meta={studio:["OPERATIONS / REPORT DESK","레포트 작업실","현장의 일사량과 점검 기록을 한 장의 운영 레포트로 정리하세요."],
     sites:["OPERATIONS / FIELD MONITOR","현장 현황","확인이 필요한 발전소를 살펴보고 담당자와 조치 내용을 기록하세요."],
     archive:["OPERATIONS / ARCHIVE","레포트 보관함","이 브라우저에서 발행한 레포트를 다시 열거나 인쇄할 수 있습니다."]}[view];
   $("#eyebrow").textContent=meta[0];$("#page-title").textContent=meta[1];$("#intro").textContent=meta[2];document.title=`HelioCone · ${meta[1]}`;
   document.querySelectorAll("[data-nav]").forEach(el=>{if(el.dataset.nav===view)el.setAttribute("aria-current","page");else el.removeAttribute("aria-current");});
   ({studio,sites,archive})[view]();
+  if(detailSite){
+    const panel=detailSite==="B"?$("#inspector"):$("#site-detail"),heading=$("h2",panel);
+    heading.tabIndex=-1;heading.focus({preventScroll:true});panel.scrollIntoView({block:"start"});
+  }else if(navigate){
+    const rowButton=view==="sites" && previousDetail && $(`[data-detail="${previousDetail}"]`);
+    if(rowButton)rowButton.focus();
+    else{window.scrollTo(0,0);$("#content").focus({preventScroll:true});}
+  }
 }
-function go(view){if(location.hash===`#${view}`)renderRoute();else location.hash=view;}
+function go(view){if(location.hash===`#${view}`)renderRoute(true);else location.hash=view;}
 document.addEventListener("input",e=>{
   const field=e.target;
   if(field.closest("#config")){
@@ -275,9 +305,9 @@ document.addEventListener("click",e=>{
   if(action==="print"&&currentRead?.issue){window.print();}
   if(action==="new"){settings={...DEFAULT_SETTINGS};zoom.preview="auto";go("studio");}
   if(open){const entry=reports().find(v=>v.id===open);if(entry){zoom.reader=100;openReader(entry.report,entry);}}
-  if(filter){readDraft();shownSites=filter;sites();}
-  if(detail){readDraft();inspectorOpen=detail==="B";detailSite=inspectorOpen?null:detail;sites();const panel=$("#inspector")||$("#site-detail");panel.scrollIntoView({block:"start"});$("button",panel).focus({preventScroll:true});}
-  if(action==="close-detail"){readDraft();const key=inspectorOpen?"B":detailSite;inspectorOpen=false;detailSite=null;sites();$(`[data-detail="${key}"]`)?.focus();}
+  if(filter){shownSites=filter;sites();}
+  if(detail)go("sites/"+detail);
+  if(action==="close-detail")go("sites");
   if(action==="start-inspection")saveInspection("확인 중");
   if(siteReport){settings={...DEFAULT_SETTINGS,site:siteReport};zoom.preview="auto";go("studio");}
 });
@@ -292,11 +322,11 @@ window.addEventListener("beforeprint",()=>{
   $("#print-document").innerHTML=report?paper(report,currentRead?.issue):"";
 });
 window.addEventListener("afterprint",()=>{document.body.classList.remove("printing-report");$("#print-document").innerHTML="";});
-window.addEventListener("hashchange",()=>{if(reader.open)reader.close();renderRoute();window.scrollTo(0,0);$("#content").focus({preventScroll:true});});
+window.addEventListener("hashchange",()=>{if(reader.open)reader.close();renderRoute(true);});
 window.addEventListener("storage",e=>{
   if(e.key&&!e.key.startsWith(STORAGE))return;
   if(currentView==="archive")archive();
-  else if(currentView==="studio")refreshPreview();
-  else{readDraft();sites();}
+  else if(currentView==="studio"){showPrioritySite();refreshPreview();}
+  else sites();
 });
 storageWarning();renderRoute();
