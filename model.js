@@ -63,14 +63,22 @@ function buildReport(settings, events) {
   const holdCount=rows.filter(row=>row.predicted===null).length;
   if(holdCount) paragraphs.push(`B 현장은 ${shortDate(LAST_DAY).slice(5)} 입력 수신이 늦어 ${holdCount}개 시간대의 예측을 보류했습니다.`);
   if(!paragraphs.length) paragraphs.push(`선택 기간에 관측값 ${received}건을 수신했습니다. 예측 보류 건은 없습니다.`);
-  return {settings:{...settings},days,rows,series,bySite,summary:paragraphs.join(" "),checks:scopeEvents,
+  return {formatVersion:2,settings:{...settings},days,rows,series,bySite,summary:paragraphs.join(" "),checks:scopeEvents,
     observed:mean(valuesOf(rows,"observed")),predicted:mean(valuesOf(rows,"predicted")),
     received,total:rows.length,rate:Math.round(received/rows.length*100)};
 }
 function csvText(report) {
   const header=["기록 유형","발전소","대상일","대상 시각","시간대","예측 기준","입력 수신","예측 GHI (W/m²)","관측 GHI (W/m²)","데이터 상태","담당자","처리 상태","확인 항목","조치 메모","기록 시각"];
   const lines=report.rows.map(r=>["GHI",r.site,r.day,r.hour,"UTC+8",r.base,r.received,r.predicted,r.observed,r.state,"","","","",""]);
-  if(report.settings.inspection) for(const e of report.checks) lines.push(["점검","B",e.day,"","UTC+8","","","","","수신 지연",e.owner,e.status,CHECKS.filter((_,i)=>e.checks[i]).join(" / "),e.memo,e.at]);
+  if(report.formatVersion===2){
+    header.push("다음 확인 사항");
+    for(const row of lines) row.push("");
+  }
+  if(report.settings.inspection) for(const e of report.checks){
+    const row=["점검","B",e.day,"","UTC+8","","","","","수신 지연",e.owner,e.status,CHECKS.filter((_,i)=>e.checks[i]).join(" / "),e.memo,e.at];
+    if(report.formatVersion===2) row.push(e.nextCheck??"");
+    lines.push(row);
+  }
   const cell=value=>{
     const s=String(value??"");
     return `"${(/^[\s]*[=@+-]/.test(s)?"'":"")+s.replaceAll('"','""')}"`;

@@ -81,13 +81,24 @@ function chart(series){
 const periodOf=r=>r.days.length===1?shortDate(r.days[0]):`${shortDate(r.days[0])} – ${shortDate(r.days.at(-1))}`;
 const titleOf=r=>r.settings.type==="daily"?"태양광 운영 일보":"태양광 운영 주보";
 const legend=()=>`<div class="legend"><span><i></i>관측</span><span><i class="dashed"></i>예측</span></div>`;
+function handoffSummary(report,entry){
+  if(!entry) return `<section class="handoff handoff-empty"><h3>인수인계 요약</h3><p>선택한 현장과 기간에 등록된 점검 기록이 없습니다.</p></section>`;
+  const reading=report.rows.find(row=>row.site==="B" && row.day===entry.day);
+  return `<section class="handoff">
+    <div class="handoff-title"><h3>인수인계 요약</h3><span>${scopeName("B")} · ${html(entry.owner)}</span></div>
+    <div class="record-box"><p class="next-check"><b>다음 확인 사항</b> ${html(entry.nextCheck||"미입력")}</p>
+      <p><b>점검 상태</b> ${html(entry.status)}${reading?` · <b>수신 상태</b> ${html(reading.state)}`:""}</p>
+      <p><b>조치 메모</b> ${html(entry.memo||"미입력")}</p>
+      <small>${html(entry.at)} (UTC+8) · 확인 항목 ${entry.checks.filter(Boolean).length}/3 · 기간 내 이력 ${report.checks.length}건</small>
+    </div></section>`;
+}
 function paper(report,issue){
   const {settings:s}=report, latest=report.checks.at(-1);
   const heading=(n,text,aside="")=>`<div class="section-title"><h3><em>${n}</em>${text}</h3>${aside}</div>`;
   const metrics=[[numberText(report.observed),"W/m²","평균 관측 GHI"],[numberText(report.predicted),"W/m²","평균 예측 GHI"],[report.rate,"%","관측 확보율"]];
   const trend=s.trend?`<section>${heading("02",s.type==="daily"?"시간대별 일사량":"일별 평균 일사량",legend())}<div class="chart-unit">GHI (W/m²)</div>${chart(report.series)}<p class="paper-note">수신된 값의 단순 평균 · 결측 구간 제외 · 일별 예측 기준 08:00 (UTC+8)</p></section>`:"";
   let inspection="";
-  if(s.inspection){
+  if(s.inspection && report.formatVersion!==2){
     inspection=`<section>${heading(s.trend?"04":"03","현장 점검 기록")}<div class="record-box">${latest?`<strong>B 현장 · ${html(latest.status)} · ${html(latest.owner)}</strong><p>${html(latest.memo||"조치 메모 미입력")}</p><small>${html(latest.at)} (UTC+8) · 확인 항목 ${latest.checks.filter(Boolean).length}/3 · 기간 내 이력 ${report.checks.length}건</small>`:"선택한 현장과 기간에 등록된 점검 기록이 없습니다."}</div></section>`;
   }
   const siteRows=report.bySite.map(v=>`<tr><td>${v.site} 현장 · ${SITES[v.site].name}</td><td>${v.received} / ${v.total}건</td><td>${v.held}건</td><td>${v.held?"수신 지연":v.received<v.total?"관측 결측":"수신 정상"}</td></tr>`).join("");
@@ -96,6 +107,7 @@ function paper(report,issue){
     <div class="letterhead"><div class="letter-brand"><img src="mark.svg" alt="">HelioCone</div><div>FIELD OPERATIONS<br><b>${s.type==="daily"?"DAILY REPORT":"WEEKLY REPORT"}</b></div></div>
     <div class="doc-heading"><div><p class="doc-kicker">태양광 발전소 운영 기록</p><h2>${titleOf(report)}</h2></div><div class="paper-stamp">운영<br>레포트</div></div>
     <div class="doc-meta"><span>대상 현장 <b>${scopeName(s.site)}</b></span><span>보고 기간 <b>${periodOf(report)}</b></span><span>작성 부서 <b>SunChip 운영팀</b></span><span>자료 구분 <b>가상 운영 데이터 · UTC+8</b></span></div>
+    ${s.inspection && report.formatVersion===2?handoffSummary(report,latest):""}
     <section>${heading("01","운영 요약")}<div class="metrics">${metrics.map(([v,u,l])=>`<div><span>${l}</span><strong>${v}<small>${u}</small></strong></div>`).join("")}</div><p class="summary">${html(report.summary)}</p></section>
     ${trend}<section>${heading(s.trend?"03":"02","데이터 수신 현황")}<table class="doc-table"><thead><tr><th>발전소</th><th>관측 확보 / 예정</th><th>예측 보류</th><th>수신 상태</th></tr></thead><tbody>${siteRows}</tbody></table></section>
     ${inspection}${s.note.trim()?`<section class="paper-memo"><b>운영자 메모</b><p>${html(s.note.trim())}</p></section>`:""}
@@ -140,7 +152,7 @@ function studio(){
     <div class="rule"></div><fieldset class="include"><legend>포함할 항목</legend>
     <label><input type="checkbox" checked disabled><span>운영 요약 · 수신 현황</span><small>필수</small></label>
     <label><input type="checkbox" name="trend" ${settings.trend?"checked":""}>일사량 추이 그래프</label>
-    <label><input type="checkbox" name="inspection" ${settings.inspection?"checked":""}>현장 점검 기록</label></fieldset>
+    <label><input type="checkbox" name="inspection" ${settings.inspection?"checked":""}>현장 점검 기록 · 인수인계 요약</label></fieldset>
     <details class="memo-entry" ${settings.note?"open":""}><summary>운영자 메모 <small>선택</small></summary><label><span class="sr-only">운영자 메모</span><textarea name="note" maxlength="160" rows="3" placeholder="보고서에 남길 내용을 입력하세요.">${html(settings.note)}</textarea></label></details>
     <p id="form-error" role="alert"></p><button class="primary generate" type="submit">${icon("fileplus")}레포트 생성${icon("arrow")}</button><p class="save-hint">${icon("archive")}생성한 문서는 보관함에 저장됩니다.</p></div>
   </form><section class="preview" aria-label="문서 미리보기">${toolbar("preview")}<div class="paper-scroll" id="preview-scroll" tabindex="0" aria-label="레포트 미리보기 문서"></div></section></div>`;
@@ -184,16 +196,18 @@ function archive(){
   work.innerHTML=`<section class="ledger"><div class="ledger-heading"><h2>발행 문서 <strong>${kept.length}</strong></h2><button class="primary compact" data-action="new">${icon("fileplus")}새 레포트</button></div>${kept.length?`<div class="archive-list">${kept.map(v=>`<div class="archive-row"><div class="file-mark">${icon("document")}</div><div><small>${html(v.code)}</small><h3>${titleOf(v.report)} <span>· ${scopeName(v.report.settings.site)}</span></h3><p>${periodOf(v.report)} <span> / </span> 발행 ${html(v.at)} (UTC+8)</p></div><button class="plain-btn" data-open="${html(v.id)}">문서 열기 ${icon("arrow")}</button></div>`).join("")}</div>`:`<div class="empty-state">${icon("archive")}<h3>아직 발행한 레포트가 없습니다.</h3><p>레포트 작업실에서 문서를 생성하면 이곳에 보관됩니다.</p></div>`}</section>`;
 }
 function latestInspection(){return events().at(-1)??null;}
-function emptyInspection(){return {owner:"",memo:"",checks:[false,false,false]};}
+function emptyInspection(){return {owner:"",memo:"",nextCheck:"",checks:[false,false,false]};}
 function inspector(){
   const latest=latestInspection(),draft=draftInspection??latest??emptyInspection();
   return `<section class="ledger inspection" id="inspector"><div class="ledger-heading"><div><p class="eyebrow">B 현장 · 해솔 발전소</p><h2>수신 상태 점검</h2></div><button class="icon-btn" data-action="close-detail" aria-label="점검 닫기">${icon("close")}</button></div>
     <div class="inspection-body"><div><p class="condition">입력 수신 07:15 · 예측 기준 08:00 · 예측 보류</p><p class="muted">점검을 완료해도 데이터 수신 상태는 별도로 표시됩니다.</p>
     <h3>확인 목록</h3>${CHECKS.map((v,i)=>`<label class="checkline"><input type="checkbox" data-check="${i}" ${draft.checks[i]?"checked":""}>${v}</label>`).join("")}</div>
     <form id="inspection-form"><label class="field">담당자<select id="owner" required><option value="">담당자를 선택하세요</option>${["운영 담당 A","운영 담당 B","운영 담당 C"].map(v=>`<option ${draft.owner===v?"selected":""}>${v}</option>`).join("")}</select></label>
-    <label class="field">조치 메모<textarea id="inspection-note" rows="3" maxlength="160" placeholder="확인한 문제와 후속 조치를 기록하세요.">${html(draft.memo)}</textarea></label><p id="inspection-error" role="alert"></p>
+    <label class="field">조치 메모<textarea id="inspection-note" rows="3" maxlength="160" placeholder="이번 점검에서 확인하고 조치한 내용을 기록하세요.">${html(draft.memo)}</textarea></label>
+    <label class="field">다음 확인 사항 <small>(선택)</small><input type="text" id="next-check" maxlength="100" aria-describedby="next-check-hint" placeholder="예: 07:15 이후 데이터 재수신 여부 확인" value="${html(draft.nextCheck)}"></label>
+    <p id="next-check-hint" class="hint">저장하면 레포트 첫머리에 담당자와 함께 표시됩니다.</p><p id="inspection-error" role="alert"></p>
     <div class="action-group">${latest?.status==="점검 기록 완료"?"":`<button class="plain-btn" type="button" data-action="start-inspection">${latest?"진행 내용 저장":"점검 시작"}</button>`}<button class="primary compact" type="submit">점검 기록 완료</button></div></form></div>
-    ${latest?`<div class="inspection-result"><div><b>${html(latest.owner)} · ${html(latest.status)}</b><p>${html(latest.memo||"조치 메모 미입력")} · ${html(latest.at)} (UTC+8)</p></div><button class="plain-btn" data-site-report="B">점검 레포트 작성 ${icon("arrow")}</button></div>`:""}</section>`;
+    ${latest?`<div class="inspection-result"><div><b>${html(latest.owner)} · ${html(latest.status)}</b><p>${html(latest.memo||"조치 메모 미입력")} · ${html(latest.at)} (UTC+8)</p><p>다음 확인 사항 · ${html(latest.nextCheck||"미입력")}</p></div><button class="plain-btn" data-site-report="B">점검 레포트 작성 ${icon("arrow")}</button></div>`:""}</section>`;
 }
 function siteDetail(site){
   const report=buildReport({...DEFAULT_SETTINGS,site},[]);
@@ -207,7 +221,7 @@ function sites(){
 }
 function readDraft(){
   if(!$("#inspection-form"))return;
-  draftInspection={owner:$("#owner").value,memo:$("#inspection-note").value,checks:[...document.querySelectorAll("[data-check]")].map(c=>c.checked)};
+  draftInspection={owner:$("#owner").value,memo:$("#inspection-note").value,nextCheck:$("#next-check").value,checks:[...document.querySelectorAll("[data-check]")].map(c=>c.checked)};
 }
 function saveInspection(status){
   readDraft();const d=draftInspection;
@@ -217,8 +231,9 @@ function saveInspection(status){
   else if(status==="점검 기록 완료"&&!d.memo.trim()){message="완료 전에 조치 내용을 기록하세요.";focus="#inspection-note";}
   if(message){$("#inspection-error").textContent=message;$(focus).focus();return;}
   const latest=latestInspection();
-  if(latest && latest.status===status && latest.owner===d.owner && latest.memo===d.memo.trim() && latest.checks.every((v,i)=>v===d.checks[i])){notice("같은 내용의 점검 기록이 이미 있습니다.");return;}
-  saveRecord("event/",{...d,memo:d.memo.trim(),status,id:uid(),at:timeStamp(),issued:Date.now(),day:LAST_DAY});
+  const memo=d.memo.trim(),nextCheck=d.nextCheck.trim();
+  if(latest && latest.status===status && latest.owner===d.owner && latest.memo===memo && (latest.nextCheck??"")===nextCheck && latest.checks.every((v,i)=>v===d.checks[i])){notice("같은 내용의 점검 기록이 이미 있습니다.");return;}
+  saveRecord("event/",{...d,memo,nextCheck,status,id:uid(),at:timeStamp(),issued:Date.now(),day:LAST_DAY});
   draftInspection=null;sites();notice(storageAvailable?"점검 기록을 저장했습니다.":"현재 탭에 점검 기록을 저장했습니다.");
   $(".inspection-result").scrollIntoView({block:"nearest"});
 }
