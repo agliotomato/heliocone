@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f6ef">
+  <meta name="description" content="가상 태양광 현장의 일사량과 점검 기록을 A4 운영 레포트로 작성하는 HelioCone 운영 데스크">
+  <title>HelioCone · 레포트 작업실</title>
+  <link rel="icon" href="mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="desk.css">
+  <script defer src="model.js"></script>
+  <script defer src="desk.js"></script>
+</head>
+<body>
+  <a class="skip" href="#content">본문으로 이동</a>
+  <header class="mast">
+    <div class="wrap mast-inner">
+      <div class="brand"><img src="mark.svg" alt=""><span>HelioCone</span></div>
+      <nav aria-label="운영 데스크 메뉴">
+        <a href="#studio" data-nav="studio"><span data-icon="document"></span>레포트 작업실</a>
+        <a href="#sites" data-nav="sites"><span data-icon="grid"></span>현장 현황</a>
+        <a href="#archive" data-nav="archive"><span data-icon="archive"></span>보관함</a>
+      </nav>
+      <span class="demo"><i></i>가상 데이터</span>
+    </div>
+  </header>
+  <main id="content" class="wrap" tabindex="-1">
+    <div class="hero">
+      <div><p class="eyebrow" id="eyebrow">OPERATIONS / REPORT DESK</p>
+        <h1 id="page-title">레포트 작업실</h1>
+        <p id="intro">현장의 일사량과 점검 기록을 한 장의 운영 레포트로 정리하세요.</p>
+      </div>
+      <img class="field-art" src="solar-field.png" alt="">
+    </div>
+    <p id="storage-warning" class="warning" hidden role="status"></p>
+    <section id="workspace"></section>
+    <noscript>레포트를 작성하려면 브라우저에서 자바스크립트를 켜 주세요.</noscript>
+  </main>
+  <footer class="site-foot wrap"><span>HelioCone <b>·</b> Team SunChip</span><span>운영 시연 데이터 · UTC+8</span></footer>
+  <dialog id="reader" aria-labelledby="reader-title">
+    <div class="reader-head"><div><p class="eyebrow" id="reader-kind"></p><h2 id="reader-title"></h2></div><button class="icon-btn" id="close-reader" aria-label="문서 닫기"><span data-icon="close"></span></button></div>
+    <div id="reader-tools"></div><div class="paper-scroll reader-scroll" id="reader-scroll" tabindex="0" aria-label="레포트 문서"></div>
+  </dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="print-document"></div>
+</body></html>
