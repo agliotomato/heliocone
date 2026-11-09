@@ -227,7 +227,7 @@ function inspector(){
     <label class="field">다음 확인 사항 <small>(선택)</small><input type="text" id="next-check" maxlength="100" aria-describedby="next-check-hint" placeholder="예: 07:15 이후 데이터 재수신 여부 확인" value="${html(draft.nextCheck)}"></label>
     <p id="next-check-hint" class="hint">저장하면 레포트 첫머리에 담당자와 함께 표시됩니다.</p><p id="inspection-error" role="alert"></p>
     <div class="action-group">${latest?.status==="점검 기록 완료"?"":`<button class="plain-btn" type="button" data-action="start-inspection">${latest?"진행 내용 저장":"점검 시작"}</button>`}<button class="primary compact" type="submit">점검 기록 완료</button></div></form></div>
-    ${latest?`<div class="inspection-result"><div><b>${html(latest.owner)} · ${html(latest.status)}</b><p>${html(latest.memo||"조치 메모 미입력")} · ${html(latest.at)} (UTC+8)</p><p>다음 확인 사항 · ${html(latest.nextCheck||"미입력")}</p></div><button class="plain-btn" data-site-report="B">점검 레포트 작성 ${icon("arrow")}</button></div>`:""}</section>`;
+    ${latest?`<div class="inspection-result"><div><h3>${html(latest.status)} · 데이터 ${html(SITES.B.label)}</h3><p><b>다음 확인 사항</b> · ${html(latest.nextCheck||"미입력")}</p><p>담당자 · ${html(latest.owner)} / ${html(latest.at)} (UTC+8)</p><p>조치 메모 · ${html(latest.memo||"미입력")}</p></div><button class="plain-btn" data-site-report="B">이 점검으로 인수인계 레포트 작성 ${icon("arrow")}</button></div>`:""}</section>`;
 }
 function siteDetail(site){
   const report=buildReport({...DEFAULT_SETTINGS,site},[]);

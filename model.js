@@ -10,7 +10,7 @@ function sitesNeedingReview(){
   return ["수신 지연","변동 주의"].flatMap(label=>Object.keys(SITES).filter(key=>SITES[key].label===label));
 }
 const CHECKS = ["수집기 연결 상태 확인", "최근 수신 시각 확인", "재수신 요청 여부 기록"];
-const DEFAULT_SETTINGS = {site:"A", type:"daily", day:LAST_DAY, trend:true, inspection:true, note:""};
+const DEFAULT_SETTINGS = {site:"B", type:"daily", day:LAST_DAY, trend:true, inspection:true, note:""};
 const scopeName = site => site === "all" ? "전체 발전소" : `${site} 현장 · ${SITES[site].name}`;
 const shiftDay = (day, offset) => new Date(Date.parse(`${day}T00:00:00Z`) + offset*86400000).toISOString().slice(0,10);
 const shortDate = day => day.replaceAll("-",".");
