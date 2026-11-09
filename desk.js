@@ -299,6 +299,24 @@ document.addEventListener("click",e=>{
     zoom[mode]=action==="fit"?"fit":action==="larger"?zoomSteps.find(v=>v>current)??200:zoomSteps.filter(v=>v<current).at(-1)??25;
     resizePaper(mode);return;
   }
+  if(action==="reset-demo"){
+    if(!window.confirm("이 브라우저의 HelioCone 점검 기록과 발행 레포트를 모두 삭제하고 시연을 처음부터 시작할까요?"))return;
+    try{
+      for(const key of Object.keys(localStorage)){
+        if(key.startsWith(STORAGE+"event/")||key.startsWith(STORAGE+"report/"))localStorage.removeItem(key);
+      }
+    }catch{
+      if(storageAvailable){notice("기록 삭제를 마치지 못했습니다. 다시 시도해 주세요.");return;}
+      notice("현재 탭을 초기화했습니다. 브라우저 저장소의 기존 기록은 확인할 수 없습니다.");
+    }
+    volatileStore.clear();
+    draftInspection=null;
+    settings={...DEFAULT_SETTINGS};
+    shownSites="all";
+    zoom={preview:"auto",reader:100};
+    go("studio");
+    return;
+  }
   if(action==="expand"&&currentReport){zoom.reader=100;openReader(currentReport,null);}
   if(action==="issue")issueReport();
   if(action==="csv"&&currentRead?.issue)exportCSV(currentRead.report);
@@ -325,6 +343,7 @@ window.addEventListener("afterprint",()=>{document.body.classList.remove("printi
 window.addEventListener("hashchange",()=>{if(reader.open)reader.close();renderRoute(true);});
 window.addEventListener("storage",e=>{
   if(e.key&&!e.key.startsWith(STORAGE))return;
+  if(e.key && e.newValue===null)volatileStore.delete(e.key);
   if(currentView==="archive")archive();
   else if(currentView==="studio"){showPrioritySite();refreshPreview();}
   else sites();
